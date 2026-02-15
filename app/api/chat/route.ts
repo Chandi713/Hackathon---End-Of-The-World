@@ -38,7 +38,8 @@ export async function POST(req: Request) {
         const formatPrompt = `
         Format the following text into clean, readable Markdown.
         Use headers (##), bullet points, and bold text to improve readability.
-        Ensure there is proper spacing between sections.
+        Ensure there is proper spacing (double newlines) between sections.
+        Do NOT use HTML tags like <br>. Use standard Markdown syntax only.
         Do NOT change the content or meaning, just the format.
         
         Text to format:
