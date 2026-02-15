@@ -50,27 +50,11 @@ export function RiskTabs({ country }: { country: CountryRisk }) {
 
   const totalDisasters = disasterTypes.reduce((acc: number, curr: any) => acc + curr.value, 0) || 0
 
-  // Simulated Cascade Network Data
-  const cascadeNodes = [
-    { id: "central", x: 300, y: 150, r: 25, color: country.color, label: country.iso3 },
-    { id: "n1", x: 150, y: 80, r: 15, color: "#3b82f6", label: "Neighbor 1" },
-    { id: "n2", x: 450, y: 80, r: 18, color: "#ef4444", label: "Trade Partner" },
-    { id: "n3", x: 100, y: 200, r: 12, color: "#f59e0b", label: "Reg. Ally" },
-    { id: "n4", x: 500, y: 220, r: 16, color: "#06b6d4", label: "Supplier" },
-    { id: "n5", x: 300, y: 280, r: 14, color: "#8b5cf6", label: "Energy Src" },
-  ]
-
-  const cascadeLinks = [
-    { source: "n1", target: "central", risk: "high" },
-    { source: "n2", target: "central", risk: "critical" },
-    { source: "n3", target: "central", risk: "low" },
-    { source: "n4", target: "central", risk: "moderate" },
-    { source: "n5", target: "central", risk: "high" },
-  ]
+  // No Cascade Data
 
   return (
     <div className="glass rounded-xl border border-border overflow-hidden">
-      <Tabs defaultValue="cascade" className="w-full">
+      <Tabs defaultValue="conflict" className="w-full">
         <div className="border-b border-border px-4 py-3 bg-muted/20">
           <TabsList className="bg-background/50 h-9 p-1 gap-1">
             <TabsTrigger value="conflict" className="text-xs px-3 data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md">
@@ -81,9 +65,6 @@ export function RiskTabs({ country }: { country: CountryRisk }) {
             </TabsTrigger>
             <TabsTrigger value="disasters" className="text-xs px-3 data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md">
               Disasters
-            </TabsTrigger>
-            <TabsTrigger value="cascade" className="text-xs px-3 data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md">
-              Cascade Risk
             </TabsTrigger>
           </TabsList>
         </div>
@@ -174,57 +155,6 @@ export function RiskTabs({ country }: { country: CountryRisk }) {
           </div>
         </TabsContent>
 
-        <TabsContent value="cascade" className="p-6 mt-0 relative min-h-[350px] flex items-center justify-center bg-black/20 rounded-lg">
-          <div className="absolute top-4 left-4 z-10">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-xs font-semibold text-red-400">Critical Risk Flow</span>
-            </div>
-            <p className="text-xs text-muted-foreground max-w-[200px]">
-              Simulated risk propagation network showing dependencies and vulnerability transfer.
-            </p>
-          </div>
-
-          <svg viewBox="0 0 600 400" className="w-full h-full max-w-[800px]">
-            <defs>
-              <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="22" refY="3.5" orient="auto">
-                <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" opacity="0.5" />
-              </marker>
-            </defs>
-
-            {/* Connection Lines */}
-            {cascadeLinks.map((link, i) => {
-              const s = cascadeNodes.find(n => n.id === link.source)!
-              const t = cascadeNodes.find(n => n.id === link.target)!
-              const color = link.risk === "critical" ? "#ef4444" : link.risk === "high" ? "#f97316" : "#3b82f6"
-
-              return (
-                <g key={i}>
-                  <line x1={s.x} y1={s.y} x2={t.x} y2={t.y} stroke={color} strokeWidth={link.risk === "critical" ? 3 : 1} strokeOpacity={0.4} strokeDasharray="4 4" />
-                  <circle r={3} fill={color}>
-                    <animateMotion dur={`${2 + Math.random()}s`} repeatCount="indefinite" path={`M${s.x},${s.y} L${t.x},${t.y}`} />
-                  </circle>
-                </g>
-              )
-            })}
-
-            {/* Nodes */}
-            {cascadeNodes.map((node, i) => (
-              <g key={node.id}>
-                {/* Pulse effect for central node */}
-                {node.id === "central" && (
-                  <circle cx={node.x} cy={node.y} r={node.r + 10} fill="none" stroke={node.color} opacity="0.3">
-                    <animate attributeName="r" from={node.r} to={node.r + 20} dur="2s" repeatCount="indefinite" />
-                    <animate attributeName="opacity" from="0.3" to="0" dur="2s" repeatCount="indefinite" />
-                  </circle>
-                )}
-
-                <circle cx={node.x} cy={node.y} r={node.r} fill={node.color} stroke="#1e293b" strokeWidth={3} className="drop-shadow-lg" />
-                <text x={node.x} y={node.y + node.r + 15} textAnchor="middle" fill="#94a3b8" fontSize="10" fontWeight="bold">{node.label}</text>
-              </g>
-            ))}
-          </svg>
-        </TabsContent>
       </Tabs>
     </div>
   )

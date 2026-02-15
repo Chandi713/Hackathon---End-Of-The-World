@@ -139,56 +139,88 @@ export default function CascadePage() {
     if (!scenario?.countryData) return { nodes: [], edges: [] }
     const c = scenario.countryData
     const risk = c.composite_score || 50
-    const conflict = c.domain_scores?.conflict || 50
-    const economy = c.domain_scores?.economy || 50
-    const weather = c.domain_scores?.weather || 50
+    const conflict = c.domain_scores?.conflict || 30
+    const economy = c.domain_scores?.economy || 30
+    const weather = c.domain_scores?.weather || 30
 
-    // Nodes
+    // Determine dominant risk to select template
+    const drivers = [
+      { type: 'conflict', val: conflict },
+      { type: 'economy', val: economy },
+      { type: 'weather', val: weather + (c.active_disasters ? 30 : 0) }
+    ].sort((a, b) => b.val - a.val)
+
+    const dominant = drivers[0].val > 40 ? drivers[0].type : 'mixed'
+
     const newNodes: CascadeNode[] = []
+    const newEdges: CascadeEdge[] = []
 
-    // Origin
-    newNodes.push({
-      id: "origin", label: scenario.label, type: "origin", x: 50, y: 8,
-      risk: risk, impact: "Origin Event", delay: 0, active: false,
-      description: `Primary disruption event in ${c.name}`
-    })
+    // --- TEMPLATES ---
 
-    // Primary (Based on domains)
-    if (conflict > 60) {
-      newNodes.push({ id: "p1", label: "Port Closures", type: "primary", x: 20, y: 28, risk: conflict, impact: "Logistics Halt", delay: 1, active: false, description: "Security concerns close major ports" })
-    } else {
-      newNodes.push({ id: "p1", label: "Labor Strikes", type: "primary", x: 20, y: 28, risk: economy, impact: "Workforce drop", delay: 1, active: false, description: "Economic unrest leads to strikes" })
+    // 1. CONFLICT TEMPLATE (Linear escalation)
+    if (dominant === 'conflict') {
+      newNodes.push(
+        { id: "origin", label: scenario.label, type: "origin", x: 50, y: 10, risk: risk, impact: "Origin Event", delay: 0, active: false, description: `Conflict eruption in ${c.country_name}` },
+        { id: "p1", label: "Border Close", type: "primary", x: 50, y: 30, risk: conflict, impact: "Trade Halt", delay: 1, active: false, description: "Borders sealed due to security" },
+        { id: "s1", label: "Refugee Crisis", type: "secondary", x: 30, y: 50, risk: conflict - 10, impact: "Migration", delay: 3, active: false, description: "Mass displacement of people" },
+        { id: "s2", label: "Sanctions", type: "secondary", x: 70, y: 50, risk: 80, impact: "Asset Freeze", delay: 2, active: false, description: "International financial sanctions" },
+        { id: "t1", label: "Regional Instability", type: "tertiary", x: 50, y: 70, risk: 60, impact: "Spread", delay: 5, active: false, description: "Conflict spills over to neighbors" }
+      )
+      newEdges.push(
+        { from: "origin", to: "p1", active: false },
+        { from: "p1", to: "s1", active: false }, { from: "p1", to: "s2", active: false },
+        { from: "s1", to: "t1", active: false }, { from: "s2", to: "t1", active: false }
+      )
     }
 
-    if (economy > 60) {
-      newNodes.push({ id: "p2", label: "Currency Crash", type: "primary", x: 50, y: 28, risk: economy, impact: "Inflation +15%", delay: 1, active: false, description: "Local currency devalues rapidly" })
-    } else {
-      newNodes.push({ id: "p2", label: "Trade Barriers", type: "primary", x: 50, y: 28, risk: 65, impact: "Tariffs", delay: 1, active: false, description: "New export restrictions imposed" })
+    // 2. ECONOMY TEMPLATE (Hub and Spoke)
+    else if (dominant === 'economy') {
+      newNodes.push(
+        { id: "origin", label: scenario.label, type: "origin", x: 50, y: 20, risk: risk, impact: "Crisis", delay: 0, active: false, description: `Economic shock in ${c.country_name}` },
+        { id: "p1", label: "Currency Crash", type: "primary", x: 20, y: 40, risk: economy, impact: "Inflation", delay: 1, active: false, description: "Rapid devaluation of currency" },
+        { id: "p2", label: "Bank Run", type: "primary", x: 50, y: 45, risk: economy + 10, impact: "Liquidity", delay: 1, active: false, description: "Citizens withdraw savings" },
+        { id: "p3", label: "Inv. Flight", type: "primary", x: 80, y: 40, risk: economy - 5, impact: "Capital Out", delay: 2, active: false, description: "Foreign investors pull out" },
+        { id: "s1", label: "Austerity", type: "secondary", x: 50, y: 65, risk: 60, impact: "Cuts", delay: 4, active: false, description: "Govt cuts public spending" }
+      )
+      newEdges.push(
+        { from: "origin", to: "p1", active: false }, { from: "origin", to: "p2", active: false }, { from: "origin", to: "p3", active: false },
+        { from: "p1", to: "s1", active: false }, { from: "p2", to: "s1", active: false }, { from: "p3", to: "s1", active: false }
+      )
     }
 
-    if (weather > 60) {
-      newNodes.push({ id: "p3", label: "Infra Damage", type: "primary", x: 80, y: 28, risk: weather, impact: "Power Outages", delay: 1, active: false, description: "Critical infrastructure damaged by event" })
-    } else {
-      newNodes.push({ id: "p3", label: "Supply Shock", type: "primary", x: 80, y: 28, risk: risk, impact: "Shortages", delay: 1, active: false, description: "Sudden drop in component availability" })
+    // 3. WEATHER TEMPLATE (Cascade down)
+    else if (dominant === 'weather') {
+      newNodes.push(
+        { id: "origin", label: scenario.label, type: "origin", x: 50, y: 10, risk: risk, impact: "Disaster", delay: 0, active: false, description: `Natural disaster in ${c.country_name}` },
+        { id: "p1", label: "Infra Damage", type: "primary", x: 30, y: 30, risk: 90, impact: "Power Loss", delay: 0, active: false, description: "Grid and transport destruction" },
+        { id: "p2", label: "Casualties", type: "primary", x: 70, y: 30, risk: 80, impact: "Human Cost", delay: 0, active: false, description: "Injuries and displacement" },
+        { id: "s1", label: "Disease", type: "secondary", x: 50, y: 50, risk: 70, impact: "Outbreak", delay: 3, active: false, description: "Waterborne diseases spread" },
+        { id: "t1", label: "Aid Request", type: "tertiary", x: 50, y: 75, risk: 40, impact: "Relief", delay: 5, active: false, description: "International aid deployment" }
+      )
+      newEdges.push(
+        { from: "origin", to: "p1", active: false }, { from: "origin", to: "p2", active: false },
+        { from: "p1", to: "s1", active: false }, { from: "p2", to: "s1", active: false },
+        { from: "s1", to: "t1", active: false }
+      )
     }
 
-    // Secondary (Generic downstream)
-    newNodes.push({ id: "s1", label: "Global Mfg", type: "secondary", x: 15, y: 50, risk: risk - 10, impact: "-20% Output", delay: 3, active: false, description: "Manufacturing slowdown globally" })
-    newNodes.push({ id: "s2", label: "Tech Sector", type: "secondary", x: 50, y: 50, risk: risk - 5, impact: "Chip Shortage", delay: 3, active: false, description: "High-tech components delayed" })
-    newNodes.push({ id: "s3", label: "Energy Market", type: "secondary", x: 85, y: 50, risk: risk - 15, impact: "Price Volatility", delay: 3, active: false, description: "Energy prices fluctuate wildly" })
-
-    // Tertiary
-    newNodes.push({ id: "t1", label: "GDP Contraction", type: "tertiary", x: 20, y: 72, risk: risk - 20, impact: "-0.5% Global", delay: 6, active: false, description: "Global economic slowdown" })
-    newNodes.push({ id: "t2", label: "Consumer Cost", type: "tertiary", x: 50, y: 72, risk: risk - 10, impact: "CPI +2%", delay: 6, active: false, description: "Cost of living increases" })
-    newNodes.push({ id: "t3", label: "Geopolitics", type: "tertiary", x: 80, y: 72, risk: conflict, impact: "Tension Rise", delay: 6, active: false, description: "Diplomatic relations strain" })
-
-    // Edges
-    const newEdges: CascadeEdge[] = [
-      { from: "origin", to: "p1", active: false }, { from: "origin", to: "p2", active: false }, { from: "origin", to: "p3", active: false },
-      { from: "p1", to: "s1", active: false }, { from: "p2", to: "s2", active: false }, { from: "p3", to: "s3", active: false },
-      { from: "p2", to: "s1", active: false }, { from: "p2", to: "s3", active: false },
-      { from: "s1", to: "t1", active: false }, { from: "s2", to: "t2", active: false }, { from: "s3", to: "t2", active: false }, { from: "s3", to: "t3", active: false }
-    ]
+    // 4. MIXED / GENERIC (Original mesh)
+    else {
+      newNodes.push(
+        { id: "origin", label: scenario.label, type: "origin", x: 50, y: 8, risk: risk, impact: "Origin Event", delay: 0, active: false, description: `Primary disruption event in ${c.country_name}` },
+        { id: "p1", label: "Labor Strikes", type: "primary", x: 20, y: 28, risk: economy, impact: "Workforce", delay: 1, active: false, description: "Economic unrest leads to strikes" },
+        { id: "p2", label: "Trade Barriers", type: "primary", x: 50, y: 28, risk: 65, impact: "Tariffs", delay: 1, active: false, description: "New export restrictions imposed" },
+        { id: "p3", label: "Supply Shock", type: "primary", x: 80, y: 28, risk: risk, impact: "Shortages", delay: 1, active: false, description: "Sudden drop in component availability" },
+        { id: "s1", label: "Global Mfg", type: "secondary", x: 20, y: 55, risk: risk - 10, impact: "-20% Output", delay: 3, active: false, description: "Manufacturing slowdown globally" },
+        { id: "s2", label: "Tech Sector", type: "secondary", x: 80, y: 55, risk: risk - 5, impact: "Chip Shortage", delay: 3, active: false, description: "High-tech components delayed" },
+        { id: "t1", label: "GDP Drop", type: "tertiary", x: 50, y: 75, risk: risk - 20, impact: "-0.5% Global", delay: 6, active: false, description: "Global economic slowdown" }
+      )
+      newEdges.push(
+        { from: "origin", to: "p1", active: false }, { from: "origin", to: "p2", active: false }, { from: "origin", to: "p3", active: false },
+        { from: "p1", to: "s1", active: false }, { from: "p3", to: "s2", active: false },
+        { from: "s1", to: "t1", active: false }, { from: "s2", to: "t1", active: false }
+      )
+    }
 
     return { nodes: newNodes, edges: newEdges }
   }
@@ -504,7 +536,18 @@ export default function CascadePage() {
                 if (!fromNode || !toNode) return null
                 const from = getNodeCenter(fromNode)
                 const to = getNodeCenter(toNode)
-                const gradientId = fromNode.type === "origin" ? "edge-active-red" : fromNode.type === "primary" ? "edge-active-amber" : "edge-active-blue"
+
+                // Use solid colors instead of gradients to avoid issues with vertical lines (zero-width bounding box)
+                const getStrokeColor = () => {
+                  if (!e.active) return "rgba(100,116,139,0.15)"
+                  switch (fromNode.type) {
+                    case "origin": return "rgba(239,68,68,0.6)" // Red
+                    case "primary": return "rgba(245,158,11,0.6)" // Amber
+                    case "secondary": return "rgba(59,130,246,0.6)" // Blue
+                    default: return "rgba(168,85,247,0.6)" // Purple
+                  }
+                }
+
                 return (
                   <line
                     key={i}
@@ -512,9 +555,9 @@ export default function CascadePage() {
                     y1={from.y}
                     x2={to.x}
                     y2={to.y}
-                    stroke={e.active ? `url(#${gradientId})` : "rgba(100,116,139,0.15)"}
-                    strokeWidth={e.active ? 0.8 : 0.2}
-                    strokeDasharray={e.active ? "none" : "1 1"}
+                    stroke={getStrokeColor()}
+                    strokeWidth={e.active ? 1.5 : 0.5}
+                    strokeDasharray={e.active ? "none" : "3 3"}
                   />
                 )
               })}
@@ -661,6 +704,6 @@ export default function CascadePage() {
           </div>
         </div>
       </div>
-    </div>
+    </div >
   )
 }
