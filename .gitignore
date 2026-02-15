@@ -58,6 +58,7 @@ wandb/
 tensorboard/
 runs/
 logs/
+Output/
 
 # macOS
 .DS_Store
